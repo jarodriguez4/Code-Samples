@@ -1,0 +1,77 @@
+import React from "react";
+import { Button } from "reactstrap";
+import * as styles from "./campaigns.module.css";
+
+const CampaignsByUserIdMap = ({
+  campaignData,
+  setDisplayRoute,
+  getDate,
+  editModal,
+  onDelete,
+  inviteInfluencer
+}) => {
+  return campaignData.map(data => (
+    <tr key={data.id}>
+      <td>
+        <a
+          href="#"
+          onClick={e => {
+            e.preventDefault();
+            setDisplayRoute(data);
+          }}
+        >
+          {data.name}
+        </a>
+      </td>
+
+      <td>{data.description}</td>
+      <td>{data.title}</td>
+      <td>{data.quantity}</td>
+      <td>{data.percent + "%"}</td>
+      <td>{data.maxInfluencers}</td>
+      <td>{"$" + data.fee}</td>
+      <td>
+        {" "}
+        {data.milestoneCount === 0 ? "No Milestone" : data.milestoneCount}
+      </td>
+      <td>{getDate(data.postDate)}</td>
+      <td>{getDate(data.dateStart)}</td>
+      <td>{getDate(data.dateEnd)}</td>
+      <td>
+        <Button
+          onClick={() => {
+            editModal(data);
+          }}
+          type="button"
+          className={` ${styles.CampaignsButtons} ${
+            styles.CampaignsButtonFont
+          } btn btn-success`}
+        >
+          <i className="fas fa-pencil-alt" /> Edit
+        </Button>
+        <Button
+          onClick={() => {
+            onDelete(data.id);
+          }}
+          type="button"
+          className={` ${styles.CampaignsButtons} ${
+            styles.CampaignButtonMargin
+          } btn btn-danger`}
+        >
+          <i className="fas fa-ban" /> Delete
+        </Button>
+        <Button
+          type="button"
+          className={` ${styles.CampaignsButtons} ${
+            styles.CampaignButtonMargin
+          } btn btn-primary`}
+          onClick={() => inviteInfluencer(data)}
+        >
+          <i className="fas fa-envelope-square" /> Invite
+        </Button>
+      </td>
+    </tr>
+  ));
+};
+
+export default React.memo(CampaignsByUserIdMap);
