@@ -1,0 +1,194 @@
+using MyApp.Data;
+using MyApp.Data.Providers;
+using MyApp.Models;
+using MyApp.Models.Domain;
+using MyApp.Models.Requests;
+using MyApp.Services.Interfaces;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace MyApp.Services
+{
+    public class MerchantService : IMerchantService
+    {
+        private IDataProvider _dataProvider;
+
+        public MerchantService(IDataProvider dataProvider)
+        {
+            _dataProvider = dataProvider;
+        }
+
+        public Paged<Merchant> GetAllPaginated(int PageIndex, int PageSize)
+        {
+            Paged<Merchant> pagedResult = null;
+            List<Merchant> result = null;
+            int totalCount = 0;
+            _dataProvider.ExecuteCmd("dbo.Merchants_SelectAllPaginated",
+              inputParamMapper: delegate (SqlParameterCollection paramCol)
+              {
+                  paramCol.AddWithValue("@PageIndex", PageIndex);
+                  paramCol.AddWithValue("@PageSize", PageSize);
+              },
+              singleRecordMapper: delegate (IDataReader reader, short set)
+               {
+                   
+                   if (result == null)
+                   {
+                       result = new List<Merchant>();
+                   }
+                   Merchant model = Mapper(reader);
+                   totalCount = reader.GetSafeInt32(9);
+
+                   result.Add(model);
+               }
+
+              );
+            if (result != null)
+            {
+                pagedResult = new Paged<Merchant>(result, PageIndex, PageSize, totalCount);
+            }
+            return pagedResult;
+        }
+
+        public Merchant GetByUserId(int id)
+        {
+            Merchant model = null;
+            _dataProvider.ExecuteCmd(
+                "dbo.Merchants_SelectByUserId",
+                inputParamMapper: delegate (SqlParameterCollection paramCol)
+                 {
+                     paramCol.AddWithValue("@UserId", id);
+                 },
+                singleRecordMapper: delegate (IDataReader reader, short set)
+                {
+                    model = Mapper(reader);
+
+                }
+
+                 );
+            return model;
+        }
+
+       
+
+        public List<ThirdPartyProcessor> ProviderGetAll()
+        {
+            List<ThirdPartyProcessor> result = null;
+            _dataProvider.ExecuteCmd(
+                "dbo.ThirdPartyProcessors_SelectAll",
+                inputParamMapper:null,
+                singleRecordMapper:delegate(IDataReader reader,short set)
+                {
+                    ThirdPartyProcessor model = new ThirdPartyProcessor();
+                    if (result == null)
+                    {
+                        result = new List<ThirdPartyProcessor>();
+                    }
+                    int index = 0;
+                    model.Id = reader.GetSafeInt32(index++);
+                    model.Provider = reader.GetSafeString(index++);
+                    result.Add(model);
+                }
+                
+                );
+            return result;
+
+        }
+
+        public int Insert(MerchantAddRequest model, int currentId)
+        {
+            int id = 0;
+            _dataProvider.ExecuteNonQuery(
+                "dbo.Merchants_Insert",
+                inputParamMapper: delegate (SqlParameterCollection paramCol)
+                 {
+                     SqlParameter parm = new SqlParameter();
+                     parm.ParameterName = "@mId";
+                     parm.SqlDbType = System.Data.SqlDbType.Int;
+                     parm.Direction = System.Data.ParameterDirection.Output;
+                     paramCol.Add(parm);
+
+                     paramCol.AddWithValue("@mUserId", currentId);
+                     paramCol.AddWithValue("@CompanyName", model.CompanyName);
+                     paramCol.AddWithValue("@CompanyURL", model.CompanyURL);
+
+                     if (model.CompanyLogo == null)
+                     {
+                         paramCol.AddWithValue("@CompanyLogo", DBNull.Value);
+                     }
+                     else
+                     {
+                        paramCol.AddWithValue("@CompanyLogo", model.CompanyLogo);
+                     }
+                     
+                     paramCol.AddWithValue("@ProviderId", model.ProviderId);
+                     paramCol.AddWithValue("@aName",model.Name);
+                     paramCol.AddWithValue("@aLineOne", model.LineOne);
+                     paramCol.AddWithValue("@aLineTwo", model.LineTwo);
+                     paramCol.AddWithValue("@aCity", model.City);
+                     paramCol.AddWithValue("@aZip", model.Zip);
+                     paramCol.AddWithValue("@aStateId", model.StateId);
+                     paramCol.AddWithValue("@aCountryId", model.CountryId);
+                  
+
+
+                 },
+                returnParameters: delegate (SqlParameterCollection paramCol)
+                {
+                    Int32.TryParse(paramCol["@mId"].Value.ToString(), out id);
+                }
+                    );
+            return id;
+        }
+
+        public void Update(MerchantUpdateRequest model)
+        {
+            _dataProvider.ExecuteNonQuery(
+                "dbo.Merchants_Update",
+                inputParamMapper: delegate (SqlParameterCollection paramCol)
+                 {
+                     paramCol.AddWithValue("@UserId", model.UserId);
+                     paramCol.AddWithValue("@CompanyName", model.CompanyName);
+                     paramCol.AddWithValue("@CompanyURL", model.CompanyURL);
+                     paramCol.AddWithValue("@CompanyLogo", model.CompanyLogo);
+                     paramCol.AddWithValue("@ProviderId", model.ProviderId);
+
+                 }
+                 );
+        }
+
+        public void UpdateisApproved (MerchantUpdateRequestV2 model)
+        {
+            _dataProvider.ExecuteNonQuery(
+                "dbo.Merchants_UpdateV2",
+                inputParamMapper: delegate (SqlParameterCollection paramCol)
+                {
+                    paramCol.AddWithValue("@UserIdm", model.UserId);
+                    paramCol.AddWithValue("@isApproved", model.isApproved);
+                }
+                
+                );
+        }
+
+
+        private Merchant Mapper(IDataReader reader)
+        {
+            Merchant model = new Merchant();
+            int index = 0;
+            model.Id = reader.GetSafeInt32(index++);
+            model.UserId = reader.GetSafeInt32(index++);
+            model.CompanyName = reader.GetSafeString(index++);
+            model.CompanyURL = reader.GetSafeString(index++);
+            model.CompanyLogo = reader.GetSafeString(index++);
+            model.Provider = reader.GetSafeString(index++);
+            model.isApproved = reader.GetSafeBool(index++);
+            model.DateCreated = reader.GetSafeDateTime(index++);
+            model.DateModified = reader.GetSafeDateTime(index++);
+
+            return model;
+        }
+    }
+
+}
