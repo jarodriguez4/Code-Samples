@@ -1,0 +1,309 @@
+import React from "react";
+import * as campaignService from "../../services/campaignService";
+import CampaignsModal from "./CampaignsModal";
+import PropTypes from "prop-types";
+import { Route } from "react-router-dom";
+import {
+  Table,
+  Button,
+  Card,
+  CardHeader,
+  CardBody,
+  Row,
+  Col
+} from "reactstrap";
+import Bundles from "./bundles/Bundles";
+import * as styles from "./campaigns.module.css";
+import logger from "../../logger";
+import SweetAlertWarning from "../ui/SweetAlertWarning";
+import PaginationBar from "../influencers/PaginationBar";
+import CampaignsByUserIdMap from "./CampaignsByUserIdMap";
+
+const _logger = logger.extend("CampaignByUserId");
+
+class CampaignByUserId extends React.Component {
+  state = {
+    userId: 0,
+    pageIndex: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+    campaignData: [],
+    campaignsModal: false,
+    bundleModal: false,
+    selectedCampaign: null,
+    confirmDelete: false,
+    deleteId: ""
+  };
+
+  componentDidMount() {
+    this.loadPage();
+  }
+
+  loadPage = () => {
+    campaignService
+      .getAllByCreated(this.state.pageIndex, 5)
+      .then(this.getCampaignsSuccess)
+      .catch(this.getCampaignsError);
+  };
+
+  campaignsGet = () => {
+    campaignService
+      .getAllByCreated(this.state.pageIndex, 5)
+      .then(this.getCampaignsSuccess)
+      .catch(this.getCampaignsError);
+  };
+
+  toggleBundleModal = () => {
+    this.setState(prevState => ({ bundleModal: !prevState.bundleModal }));
+  };
+
+  handleCreateNewCampaign = () => {
+    this.props.history.push("/campaigns/myCampaigns/new");
+  };
+
+  closeRoutePath = () => {
+    this.setState(state => ({ campaignsModal: !state.campaignsModal }));
+    this.props.history.push(`/campaigns/myCampaigns`);
+  };
+  setModal = modal => {
+    this.setState({ modal });
+  };
+
+  getCampaignsSuccess = res => {
+    _logger("JOE CAMPAIGNBYUSERID", res);
+    this.setState({
+      campaignData: res.item.pagedItems,
+      pageIndex: res.item.pageIndex,
+      totalPages: res.item.totalPages,
+      hasPreviousPage: res.item.hasPreviousPage,
+      hasNextPage: res.item.hasNextPage
+    });
+  };
+
+  getCampaignsError = err => {
+    console.log(err);
+  };
+
+  setDisplayRoute = value => {
+    this.props.history.push(`/campaigns/display/${value.externalId}`, {
+      action: "CREATEDBY",
+      campaign: value
+    });
+  };
+
+  getDate = date => {
+    date = new Date(date);
+    let year = date.getFullYear();
+    let month = date.getMonth() + 1;
+    let dt = date.getDate();
+    if (dt < 10) {
+      dt = "0" + dt;
+    }
+    if (month < 10) {
+      month = "0" + month;
+    }
+    return year + "-" + month + "-" + dt;
+  };
+  getProfileInfo = info => {
+    this.setDisplayRoute(info.externalId);
+  };
+
+  inviteInfluencer = data => {
+    this.props.history.push({
+      pathname: "invite",
+      state: {
+        campaignId: data.id,
+        externalId: data.externalId
+      }
+    });
+  };
+
+  editModal = campaign => {
+    this.setState({ selectedCampaign: campaign });
+    this.props.history.push(
+      `/campaigns/myCampaigns/edit/${campaign.externalId}`
+    );
+  };
+
+  onDelete = info => {
+    this.setState({ confirmDelete: true, deleteId: info });
+  };
+  deleteCampaign = () => {
+    campaignService
+      .deleteById(this.state.deleteId)
+      .then(this.onDeleteSuccess)
+      .then(this.setState({ confirmDelete: false }))
+      .catch(this.onDeleteError);
+  };
+  onDeleteSuccess = response => {
+    _logger(response);
+    this.campaignsGet();
+  };
+
+  onDeleteError = error => {
+    logger(error);
+  };
+
+  cancelDelete = () => {
+    this.setState({ confirmDelete: false });
+  };
+
+  paginateNext = () => {
+    this.setState(
+      {
+        pageIndex: this.state.pageIndex + 1
+      },
+      this.campaignsGet
+    );
+  };
+  paginatePrev = () => {
+    this.setState(
+      {
+        pageIndex: this.state.pageIndex - 1
+      },
+      this.campaignsGet
+    );
+  };
+
+  render() {
+    const { campaignData, bundleModal, userId } = this.state;
+    return (
+      <>
+        <div>
+          <Row>
+            <Col>
+              <Card className={styles.CampaignsList}>
+                <CardHeader>
+                  <Row>
+                    <Col md={{ size: 6 }} className="text-left">
+                      <h3 className={styles.CampaignsHeader}>My Campaigns</h3>
+                    </Col>
+                    <Col md={{ size: 6 }} className="text-right">
+                      <Button
+                        type="button"
+                        className={`${
+                          styles.CampaignsModalButton
+                        } btn btn-danger`}
+                        onClick={() => this.handleCreateNewCampaign()}
+                      >
+                        Create Campaign
+                      </Button>
+                      <Button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => this.toggleBundleModal()}
+                      >
+                        Create a Bundle
+                      </Button>
+                    </Col>
+                  </Row>
+                </CardHeader>
+                <CardBody>
+                  <div className="table-responsive">
+                    <PaginationBar
+                      previous10={this.paginatePrev}
+                      next10={this.paginateNext}
+                      hasPreviousPage={this.state.hasPreviousPage}
+                      hasNextPage={this.state.hasNextPage}
+                      pageIndex={this.state.pageIndex}
+                      totalPages={this.state.totalPages}
+                    />
+
+                    <Table
+                      id="demo-foo-addrow"
+                      className="table table-bordered m-t-30 table-hover contact-list"
+                      data-paging="true"
+                      data-paging-size="7"
+                    >
+                      <thead className={styles.CampaignsTableHead}>
+                        <tr>
+                          {/* <th>Public ID</th> */}
+                          <th>Name</th>
+                          <th>Description</th>
+                          <th>Product</th>
+                          <th>Quantity</th>
+                          <th>Discount</th>
+                          <th>Max Influencers</th>
+                          <th>Fee</th>
+                          <th>Milestone Count</th>
+                          <th>Post Date</th>
+                          <th>Date Start</th>
+                          <th>Date End</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {campaignData ? (
+                          <CampaignsByUserIdMap
+                            campaignData={this.state.campaignData}
+                            setDisplayRoute={this.setDisplayRoute}
+                            getDate={this.getDate}
+                            editModal={this.editModal}
+                            onDelete={this.onDelete}
+                            inviteInfluencer={this.inviteInfluencer}
+                          />
+                        ) : (
+                          "You have no campaigns"
+                        )}
+                      </tbody>
+                    </Table>
+                  </div>
+                </CardBody>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+        <div className="w-100">
+          {bundleModal ? (
+            <Bundles
+              toggleBundleModal={this.toggleBundleModal}
+              bundleModal={bundleModal}
+              userId={userId}
+            />
+          ) : null}
+        </div>
+        <Route
+          exact
+          path="/campaigns/myCampaigns/new"
+          render={() => (
+            <CampaignsModal
+              modal={this.state.modal}
+              setModal={this.setModal}
+              campaignsGet={this.campaignsGet}
+              setRouteValue={this.setRouteValue}
+              closeRoutePath={this.closeRoutePath}
+            />
+          )}
+        />
+        <Route
+          exact
+          path="/campaigns/myCampaigns/edit/:id"
+          render={() => (
+            <CampaignsModal
+              {...this.state}
+              modal={this.state.modal}
+              setModal={this.setModal}
+              campaignsGet={this.campaignsGet}
+              setRouteValue={this.setRouteValue}
+              closeRoutePath={this.closeRoutePath}
+              selectedCampaign={this.state.selectedCampaign}
+            />
+          )}
+        />
+        {this.state.confirmDelete && (
+          <SweetAlertWarning
+            confirmAction={this.deleteCampaign}
+            cancelAction={this.cancelDelete}
+          />
+        )}
+      </>
+    );
+  }
+}
+
+CampaignByUserId.propTypes = {
+  history: PropTypes.object
+};
+
+export default CampaignByUserId;
