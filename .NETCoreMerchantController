@@ -1,0 +1,178 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using MyApp.Models;
+using MyApp.Models.Domain;
+using MyApp.Models.Requests;
+using MyApp.Services;
+using MyApp.Services.Interfaces;
+using MyApp.Web.Controllers;
+using MyApp.Web.Models.Responses;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace MyApp.Web.Api.Controllers
+{
+    [Route("api/merchants")]
+    [ApiController]
+    public class MerchantController : BaseApiController
+    {
+        private IAuthenticationService<int> _authenticationService;
+        private IMerchantService _merchantService;
+
+        public object ActionResult { get; private set; }
+
+        public MerchantController(IAuthenticationService<int> authService, IMerchantService merchantService, ILogger<MerchantController> logger): base(logger)
+        {
+            _authenticationService = authService;
+            _merchantService = merchantService;
+        }
+
+        [HttpGet("{pageIndex:int}/{pageSize:int}")]
+        public ActionResult<ItemsResponse<Merchant>> GetAllPaginated(int pageIndex,int pageSize)
+        {
+            ActionResult result = null;
+            try
+            {
+                Paged<Merchant> merchants = _merchantService.GetAllPaginated(pageIndex, pageSize);
+                if(merchants == null)
+                {
+                    result = NotFound404(new ErrorResponse("Does not exist!"));
+                }
+                else
+                {
+                    ItemResponse<Paged<Merchant>> response = new ItemResponse<Paged<Merchant>>();
+                    response.Item = merchants;
+                    result = Ok200(response);
+                }
+            }
+            catch(Exception e)
+            {
+                Logger.LogError(e.ToString());
+                result = StatusCode(500, new ErrorResponse(e.Message));
+            }
+            return result;
+        }
+
+        [HttpGet("{id:int}")]
+        public ActionResult<ItemResponse<Merchant>> GetByUserId(int id)
+        {
+            ActionResult result = null;
+
+            try
+            {
+                Merchant model = _merchantService.GetByUserId(id);
+                if(model == null)
+                {
+                    result = NotFound404(new ErrorResponse("Does not exist!"));
+                }
+                else
+                {
+                    ItemResponse<Merchant> response = new ItemResponse<Merchant>();
+                    response.Item = model;
+                    result = Ok200(response);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e.ToString());
+                result =StatusCode(500, new ErrorResponse(e.Message));
+            }
+            return result;
+        }
+
+        [HttpGet ("providers")]
+        public ActionResult<ItemsResponse<ThirdPartyProcessor>> GetAllProviders()
+        {
+            ActionResult result = null;
+
+            try
+            {
+                List<ThirdPartyProcessor> providers = _merchantService.ProviderGetAll();
+                if (providers == null)
+                {
+                    result = NotFound404(new ErrorResponse("Does not exist!"));
+                }
+                else
+                {
+                    ItemsResponse<ThirdPartyProcessor> response = new ItemsResponse<ThirdPartyProcessor>();
+                    response.Items = providers;
+                    result = Ok200(response);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e.ToString());
+                result = StatusCode(500, new ErrorResponse(e.Message));
+            }
+
+            return result;
+        }
+
+        [HttpPost]
+        public ActionResult<ItemResponse<int>> Insert(MerchantAddRequest model)
+        {
+            ActionResult result = null;
+
+            try
+            {
+                int currentId = _authenticationService.GetCurrentUserId();
+                if(currentId > 0)
+                {
+                    ItemResponse<int> response = new ItemResponse<int>();
+                    int newId = _merchantService.Insert(model, currentId);
+                    response.Item = newId;
+                    result = Created201(response);
+                }
+                else
+                {
+                    result = NotFound404(new ErrorResponse("ID not valid!"));
+                }
+            }
+            catch(Exception e)
+            {
+                Logger.LogError(e.ToString());
+                result = StatusCode(500, new ErrorResponse(e.Message));
+            }
+            return result;
+        }
+
+        [HttpPut("{id:int}")]
+        public ActionResult<SuccessResponse> MerchantUpdate(MerchantUpdateRequest model)
+        {
+            ActionResult result = null;
+            try
+            {
+                _merchantService.Update(model);
+                SuccessResponse response = new SuccessResponse();
+                result = Ok200(response);
+            }
+            catch(Exception e)
+            {
+                Logger.LogError(e.ToString());
+                result = StatusCode(500, new ErrorResponse(e.Message));
+            }
+            return result;
+        }
+
+        [HttpPut("approve/{id:int}")]
+        public ActionResult<SuccessResponse> ApproveMerchantUpdate(MerchantUpdateRequestV2 model)
+        {
+            ActionResult result = null;
+            try
+            {
+                _merchantService.UpdateisApproved(model);
+                SuccessResponse response = new SuccessResponse();
+                result = Ok200(response);
+            }
+            catch(Exception e)
+            {
+                Logger.LogError(e.ToString());
+                result = StatusCode(500, new ErrorResponse(e.Message));
+            }
+            return result;
+        }
+
+    }
+}
