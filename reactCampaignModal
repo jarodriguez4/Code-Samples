@@ -1,0 +1,447 @@
+import React from "react";
+import * as campaignService from "../../services/campaignService";
+import { Formik, Form, Field } from "formik";
+import { Button, Modal, ModalBody, ModalFooter } from "reactstrap";
+import { InputGroupAddon, Input, InputGroup } from "reactstrap";
+import { withRouter } from "react-router-dom";
+import * as CampaignsSchema from "./campaignsSchema";
+import ProductsDropdown from "./CampaignsProductsDropdown";
+import DiscountDropdown from "./CampaignsDiscountDropdown";
+import PropTypes from "prop-types";
+import logger from "../../logger";
+
+const _logger = logger.extend("CampaignsModal");
+
+class CampaignsModal extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.toggle = this.toggle.bind(this);
+  }
+
+  componentDidMount = () => {
+    if (this.props.selectedCampaign) {
+      this.props.setModal(true);
+      return (
+        (CampaignsSchema.initialValues.id = this.props.selectedCampaign.id),
+        (CampaignsSchema.initialValues.name = this.props.selectedCampaign.name),
+        (CampaignsSchema.initialValues.description = this.props.selectedCampaign.description),
+        // (CampaignsSchema.initialValues.productId = this.props.selectedCampaign.productId),
+        (CampaignsSchema.initialValues.quantity = this.props.selectedCampaign.quantity),
+        //(CampaignsSchema.initialValues.discountId = this.props.selectedCampaign.discountId),
+        //(CampaignsSchema.initialValues.productId = this.state.id),
+        (CampaignsSchema.initialValues.metaTagId = 10),
+        (CampaignsSchema.initialValues.maxInfluencers = this.props.selectedCampaign.maxInfluencers),
+        (CampaignsSchema.initialValues.fee = this.props.selectedCampaign.fee),
+        (CampaignsSchema.initialValues.milestoneCount = this.props.selectedCampaign.milestoneCount),
+        (CampaignsSchema.initialValues.postDate =
+          this.props.selectedCampaign.postDate === "0001-01-01T00:00:00"
+            ? null
+            : this.getDate(this.props.selectedCampaign.postDate)),
+        (CampaignsSchema.initialValues.dateStart = this.getDate(
+          this.props.selectedCampaign.dateStart
+        )),
+        (CampaignsSchema.initialValues.dateEnd = this.getDate(
+          this.props.selectedCampaign.dateEnd
+        ))
+      );
+    } else {
+      this.loadForm();
+      return (CampaignsSchema.initialValues.postDate = this.getDate(
+        new Date()
+      ));
+    }
+  };
+
+  loadForm = () => {
+    const { id } = this.props.match.params;
+    if (id) {
+      campaignService
+        .getByGuid(id)
+        .then(this.onGetByIdSuccess)
+        .catch(this.onGetByIdError);
+    } else {
+      console.log("creating new");
+      this.props.setModal(true);
+    }
+  };
+
+  getDate = date => {
+    date = new Date(date);
+    let year = date.getFullYear();
+    let month = date.getMonth() + 1;
+    let dt = date.getDate();
+    if (dt < 10) {
+      dt = "0" + dt;
+    }
+    if (month < 10) {
+      month = "0" + month;
+    }
+    return year + "-" + month + "-" + dt;
+  };
+
+  onGetByIdSuccess = response => {
+    console.log(response);
+    const data = response.item;
+    this.props.setModal(true);
+    return (
+      (CampaignsSchema.initialValues.id = data.id),
+      (CampaignsSchema.initialValues.name = data.name),
+      (CampaignsSchema.initialValues.description = data.description),
+      (CampaignsSchema.initialValues.productId = data.productId),
+      (CampaignsSchema.initialValues.quantity = data.quantity),
+      (CampaignsSchema.initialValues.discountId = data.discountId),
+      (CampaignsSchema.initialValues.metaTagId = 10),
+      (CampaignsSchema.initialValues.maxInfluencers = data.maxInfluencers),
+      (CampaignsSchema.initialValues.fee = data.fee),
+      (CampaignsSchema.initialValues.milestoneCount = data.milestoneCount),
+      (CampaignsSchema.initialValues.postDate =
+        data.postDate === "0001-01-01T00:00:00"
+          ? null
+          : this.getDate(data.postDate)),
+      (CampaignsSchema.initialValues.dateStart = this.getDate(data.dateStart)),
+      (CampaignsSchema.initialValues.dateEnd = this.getDate(data.dateEnd))
+    );
+  };
+
+  toggle() {
+    this.props.closeRoutePath();
+    Object.keys(CampaignsSchema.initialValues).forEach(
+      i => (CampaignsSchema.initialValues[i] = "")
+    );
+    return (CampaignsSchema.initialValues.metaTagId = 10);
+  }
+
+  onSubmit = (values, { setSubmitting }) => {
+    if (CampaignsSchema.initialValues.id) {
+      campaignService
+        .update(values, values.id)
+        .then(this.onUpdateSuccess)
+        .catch(this.onUpdateError)
+        .then(setSubmitting(false));
+    } else {
+      _logger("JOSEpH", values);
+
+      campaignService
+        .insert(values)
+        .then(this.onCreateSuccess)
+        .catch(this.onCreateError)
+        .then(setSubmitting(false));
+    }
+  };
+
+  onUpdateSuccess = response => {
+    this.toggle();
+    console.log(response);
+    this.props.campaignsGet();
+  };
+  onUpdateError = error => {
+    this.toggle();
+    console.log(error);
+  };
+
+  onCreateSuccess = response => {
+    console.log(response);
+    this.toggle();
+    this.props.campaignsGet();
+  };
+
+  onCreateError = error => {
+    console.log(error);
+  };
+
+  render() {
+    return (
+      <Modal
+        isOpen={this.props.modal}
+        modalTransition={{ timeout: 0 }}
+        backdropTransition={{ timeout: 0 }}
+        toggle={this.toggle}
+        fade={true}
+      >
+        <ModalBody>
+          <div className="card-body">
+            <Formik
+              validationSchema={CampaignsSchema.schema}
+              enableReinitialize
+              initialValues={CampaignsSchema.initialValues}
+              onSubmit={this.onSubmit}
+              render={({
+                values,
+                touched,
+                errors,
+                dirty,
+                isSubmitting,
+                setFieldValue
+              }) => (
+                <Form>
+                  <div className="form-body">
+                    {CampaignsSchema.initialValues.id ? (
+                      <h3 className="card-title">Edit a Campaign</h3>
+                    ) : (
+                      <h3 className="card-title">Add a Campaign</h3>
+                    )}
+
+                    <hr />
+                    <div className="row p-t-20">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Name
+                          <br />
+                          <Field
+                            type="text"
+                            name="name"
+                            placeholder="Name"
+                            className="form-control"
+                            value={values.name}
+                          />
+                          {errors.name && touched.name ? (
+                            <div style={{ color: "red" }}>{errors.name} </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Description <br />
+                          <Field
+                            type="text"
+                            name="description"
+                            placeholder="Description"
+                            className="form-control"
+                            value={values.description || ""}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Product
+                          <br />
+                          <ProductsDropdown
+                            name="productId"
+                            placeholder="Enter Product"
+                            className="form-control"
+                            onChange={setFieldValue}
+                            value={Number(values.productId)}
+                          />
+                          {errors.productId && touched.productId ? (
+                            <div style={{ color: "red" }}>
+                              {errors.productId}{" "}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Quantity
+                          <br />
+                          <Field
+                            type="number"
+                            name="quantity"
+                            placeholder="Enter a Quantity"
+                            className="form-control"
+                            value={values.quantity}
+                          />
+                          {errors.quantity && touched.quantity ? (
+                            <div style={{ color: "red" }}>
+                              {errors.quantity}{" "}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Discount
+                          <br />
+                          <DiscountDropdown
+                            type="number"
+                            name="discountId"
+                            placeholder="Enter a Discount ID"
+                            className="form-control"
+                            value={values.discountId}
+                            onChange={setFieldValue}
+                            productId={values.productId}
+                          />
+                          {errors.discountId && touched.discountId ? (
+                            <div style={{ color: "red" }}>
+                              {errors.discountId}{" "}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      {false && (
+                        <div className="col-md-6">
+                          <div className="form-group">
+                            Meta tag ID
+                            <br />
+                            <Field
+                              type="number"
+                              name="metaTagId"
+                              placeholder="Enter a Meta tag ID"
+                              className="form-control"
+                              value={10}
+                            />
+                            {errors.metaTagId && touched.metaTagId ? (
+                              <div style={{ color: "red" }}>
+                                {errors.metaTagId}{" "}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Max Influencers
+                          <br />
+                          <Field
+                            type="number"
+                            name="maxInfluencers"
+                            placeholder="Enter Max Influencers"
+                            className="form-control"
+                            value={values.maxInfluencers}
+                          />
+                          {errors.maxInfluencers && touched.maxInfluencers ? (
+                            <div style={{ color: "red" }}>
+                              {errors.maxInfluencers}{" "}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Fee
+                          <br />
+                          <InputGroup>
+                            <InputGroupAddon addonType="append">
+                              $
+                            </InputGroupAddon>
+                            <Input
+                              tag={Field}
+                              type="number"
+                              placeholder="Base Price"
+                              name="fee"
+                              value={values.fee}
+                              id="campaignFee"
+                            />
+                          </InputGroup>
+                          {errors.fee && touched.fee ? (
+                            <div style={{ color: "red" }}>{errors.fee} </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Milestone Count
+                          <br />
+                          <Field
+                            type="number"
+                            name="milestoneCount"
+                            placeholder="Enter a Milestone"
+                            className="form-control"
+                            value={values.milestoneCount || ""}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Post Date
+                          <br />
+                          <Field
+                            type="date"
+                            name="postDate"
+                            placeholder="Enter a Post Date"
+                            className="form-control"
+                            value={values.postDate || ""}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Date Start
+                          <br />
+                          <Field
+                            type="date"
+                            name="dateStart"
+                            placeholder="Enter Campaign Start Date"
+                            className="form-control"
+                            value={values.dateStart}
+                          />
+                          {errors.dateStart && touched.dateStart ? (
+                            <div style={{ color: "red" }}>
+                              {errors.dateStart}{" "}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          Date End
+                          <br />
+                          <Field
+                            type="date"
+                            name="dateEnd"
+                            placeholder="Enter Campaign End Date"
+                            className="form-control"
+                            value={values.dateEnd}
+                          />
+                          {errors.dateEnd && touched.dateEnd ? (
+                            <div style={{ color: "red" }}>
+                              {errors.dateEnd}{" "}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <br />
+                          <br />
+                          <br />
+                          <br />
+                          <button
+                            type="submit"
+                            className="btn btn-success pull-left"
+                            disabled={isSubmitting || !dirty}
+                          >
+                            Submit
+                          </button>
+                          <center>
+                            <Button color="secondary" onClick={this.toggle}>
+                              Cancel
+                            </Button>
+                          </center>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Form>
+              )}
+            />
+          </div>
+        </ModalBody>
+        <ModalFooter />
+      </Modal>
+    );
+  }
+}
+
+CampaignsModal.propTypes = {
+  setModal: PropTypes.func,
+  campaignsGet: PropTypes.func,
+  setRouteId: PropTypes.func,
+  closeRoutePath: PropTypes.func,
+  showDisplay: PropTypes.func,
+  setRouteValue: PropTypes.func,
+  selectedCampaign: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
+  modal: PropTypes.bool,
+  match: PropTypes.object
+};
+
+export default withRouter(CampaignsModal);
